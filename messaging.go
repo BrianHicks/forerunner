@@ -23,6 +23,15 @@ type Message struct {
 	Sent    time.Time
 }
 
+func MessageFromError(topic string, level int, err error) Message {
+	return Message{
+		Topic:   topic,
+		Level:   level,
+		Message: fmt.Sprintf("%s", err),
+		Sent:    time.Now(),
+	}
+}
+
 func (m Message) String() string {
 	s := fmt.Sprintf(
 		"[%s] %s (%s)",
@@ -87,6 +96,17 @@ func (r *Router) Route() {
 
 		for _, rec := range recs {
 			rec <- message
+		}
+	}
+}
+
+func Messenger(topic string, to chan Message) func(int, string) {
+	return func(level int, message string) {
+		to <- Message{
+			Topic:   topic,
+			Level:   level,
+			Message: message,
+			Sent:    time.Now(),
 		}
 	}
 }
