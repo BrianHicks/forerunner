@@ -226,14 +226,12 @@ func DockerListener(in, out chan Message) {
 					host.Dns = strings.Split(config.DNS, ",")
 				}
 
-				fmt.Printf("%+v\n", host)
-
 				_, err = dockerClient.CreateAndStart(name, &conf, &host)
 
 				if err != nil {
 					send(LevelFatal, StatusBad, fmt.Sprintf("could not start container: %s", err))
 				} else {
-					send(LevelChange, StatusGood, "container running")
+					send(LevelChange, StatusUp, "container running")
 				}
 			}
 
@@ -256,7 +254,7 @@ func DockerListener(in, out chan Message) {
 				send(LevelDebug, StatusNeutral, "no container running")
 
 			} else {
-				send(LevelInfo, StatusNeutral, "shutting down container")
+				send(LevelInfo, StatusDown, "shutting down container")
 
 				err = dockerClient.CompletelyKill(container.ID)
 				if err != nil {
