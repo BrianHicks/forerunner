@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -112,6 +113,8 @@ func DockerListener(in, out chan Message) {
 	timeout := 2 * time.Second
 	lock := sync.Mutex{}
 
+	etcdClient := etcd.NewClient(strings.Split(config.EtcdHosts, ","))
+
 	// listen for messages
 	for message := range in {
 		switch message.Topic {
@@ -132,6 +135,9 @@ func DockerListener(in, out chan Message) {
 			reset := func() {
 				lock.Lock()
 				defer lock.Unlock()
+				defer func() {
+					timer = nil
+				}()
 
 				//// PULL IMAGE ////
 				img := config.Image + ":" + EtcdTag
@@ -147,6 +153,35 @@ func DockerListener(in, out chan Message) {
 				}
 
 				send(LevelDebug, StatusNeutral, "pulled "+img)
+
+				// acquire lock
+				lockPath := "/forerunner/locks/" + config.Group
+				send(LevelDebug, StatusNeutral, fmt.Sprintf("trying to acquire lock at %s", lockPath))
+
+				// we're going to give it 100 tries (60 seconds) to acquire a
+				// lock for restarting, but if we can't get it after that long
+				// we'll assume a deadlock and just proceed without one
+				for i := 0; i < 100; i++ {
+					_, err := etcdClient.Create(lockPath, "", 10)
+
+					if err != nil {
+						if strings.Contains(err.Error(), "Key already exists") {
+							time.Sleep(600 * time.Millisecond)
+							continue
+						} else {
+							send(LevelFatal, StatusBad, err.Error())
+							return
+						}
+
+					} else {
+						send(LevelDebug, StatusNeutral, fmt.Sprintf("got lock after %d tries", i))
+
+						// defer releasing that lock after we're done
+						defer etcdClient.Delete(lockPath, false)
+
+						break
+					}
+				}
 
 				//// START ////
 				container, err := dockerClient.ContainerByName(name)
@@ -200,8 +235,6 @@ func DockerListener(in, out chan Message) {
 				} else {
 					send(LevelChange, StatusGood, "container running")
 				}
-
-				timer = nil
 			}
 
 			if timer == nil {
