@@ -48,9 +48,15 @@ func EnvironmentListener(in, out chan Message) {
 			case TopicShutdown:
 				watchStop <- true
 				send(LevelInfo, fmt.Sprintf("cleared watches on %s", config.ConfigPrefix))
+				return
 			}
 
 		case resp := <-watch:
+			if resp == nil {
+				send(LevelWarning, "received a nil response")
+				continue
+			}
+
 			switch resp.Node.Key {
 			case tagKey:
 				EtcdTag = resp.Node.Value
