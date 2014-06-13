@@ -9,12 +9,13 @@ import (
 const (
 	LevelDebug = iota
 	LevelInfo
+	LevelChange
 	LevelWarning
 	LevelError
 	LevelFatal
 )
 
-var names = []string{"debug", "info", "warning", "error", "fatal"}
+var names = []string{"debug", "info", "change", "warning", "error", "fatal"}
 
 type Message struct {
 	Topic   string
@@ -55,7 +56,7 @@ func NewRouter() *Router {
 	r := Router{
 		sync.RWMutex{},
 		map[string][]chan Message{},
-		make(chan Message),
+		make(chan Message, 10),
 	}
 
 	go r.Route()
@@ -64,16 +65,13 @@ func NewRouter() *Router {
 }
 
 func (r *Router) Register(subscriber func(chan Message, chan Message), topics ...string) {
-	sub := make(chan Message)
+	sub := make(chan Message, 10)
 	r.Subscribe(sub, topics...)
 
 	go subscriber(sub, r.In)
 }
 
 func (r *Router) Subscribe(subscriber chan Message, topics ...string) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	for _, topic := range topics {
 		rec, ok := r.receivers[topic]
 		if !ok {
@@ -86,9 +84,7 @@ func (r *Router) Subscribe(subscriber chan Message, topics ...string) {
 
 func (r *Router) Route() {
 	for message := range r.In {
-		r.lock.RLock()
 		recs, ok := r.receivers[message.Topic]
-		r.lock.RUnlock()
 
 		if !ok {
 			continue

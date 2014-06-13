@@ -11,10 +11,10 @@ var (
 	router *Router
 	config *Config
 
-	TopicInit         = "init"
-	TopicShutdown     = "shutdown"
-	TopicConfigChange = "config-change"
-	TopicDocker       = "docker"
+	TopicInit        = "init"
+	TopicShutdown    = "shutdown"
+	TopicEnvironment = "environment"
+	TopicDocker      = "docker"
 )
 
 func init() {
@@ -23,8 +23,9 @@ func init() {
 }
 
 func main() {
-	router.Register(DockerListener, TopicInit, TopicShutdown)
-	router.Register(LogListener, TopicInit, TopicShutdown, TopicDocker)
+	router.Register(DockerListener, TopicInit, TopicShutdown, TopicEnvironment)
+	router.Register(LogListener, TopicInit, TopicShutdown, TopicDocker, TopicEnvironment)
+	router.Register(EnvironmentListener, TopicInit, TopicShutdown)
 
 	router.In <- Message{
 		Topic: TopicInit,

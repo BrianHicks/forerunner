@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -13,11 +15,13 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	LogLevel        int
 
+	Group string
+	ID    string
+
 	// Docker
 	Image          string
 	Registry       string
 	DockerEndpoint string
-	Name           string
 
 	// Etcd
 	EtcdHosts    string
@@ -27,17 +31,26 @@ type Config struct {
 func NewConfig() *Config {
 	c := new(Config)
 
-	pflag.StringVar(&c.Image, "image", "", "docker image to run")
-	pflag.StringVar(&c.Registry, "registry", "", "docker registry to contact")
-	pflag.StringVar(&c.Name, "name", "", "name of docker container")
-	pflag.StringVar(&c.DockerEndpoint, "docker-endpoint", "unix:///var/run/docker.sock", "docker socket to use")
-	pflag.DurationVar(&c.ShutdownTimeout, "shutdown-timeout", 5*time.Second, "how long to wait after intterupt before forcibly stopping")
-	pflag.StringVar(&c.EtcdHosts, "etcd-hosts", "http://127.0.0.1:4001", "comma-separated list of etcd hosts to connect to")
-	pflag.StringVar(&c.ConfigPrefix, "config-prefix", "/forerunner/", "etcd prefix to pull configuration from")
+	set := pflag.NewFlagSet("forerunner", pflag.ExitOnError)
 
-	logLevel := pflag.String("log-level", "info", "level to log at (debug, info, warning, error, fatal)")
+	set.DurationVar(&c.ShutdownTimeout, "shutdown-timeout", 5*time.Second, "how long to wait after interupt before forcibly stopping")
+	set.StringVar(&c.Group, "group", "", "this service's group")
+	set.StringVar(&c.ID, "id", "", "this service's ID")
 
-	pflag.Parse()
+	logLevel := set.String("log-level", "info", "level to log at (debug, info, warning, error, fatal)")
+
+	set.StringVar(&c.Image, "image", "", "docker image to run")
+	set.StringVar(&c.Registry, "registry", "", "docker registry to contact")
+	set.StringVar(&c.DockerEndpoint, "docker-endpoint", "unix:///var/run/docker.sock", "docker socket to use")
+
+	set.StringVar(&c.EtcdHosts, "etcd-hosts", "http://127.0.0.1:4001", "comma-separated list of etcd hosts to connect to")
+	set.StringVar(&c.ConfigPrefix, "config-prefix", "/forerunner/", "etcd prefix to pull configuration from")
+
+	err := set.Parse(os.Args)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	switch strings.ToLower(*logLevel) {
 	case "debug":
