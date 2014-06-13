@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	EtcdEnvironment = map[string]string{}
-	EtcdTag         = "latest"
+	EtcdEnv = []string{}
+	EtcdTag = "latest"
 )
 
 func EnvironmentListener(in, out chan Message) {
@@ -63,11 +63,11 @@ func EnvironmentListener(in, out chan Message) {
 				send(LevelChange, StatusNeutral, fmt.Sprintf("tag is %s", EtcdTag))
 
 			case envKey:
-				err := json.Unmarshal([]byte(resp.Node.Value), &EtcdEnvironment)
+				err := json.Unmarshal([]byte(resp.Node.Value), &EtcdEnv)
 				if err != nil {
 					send(LevelFatal, StatusNeutral, fmt.Sprintf("error loading env: %s", err))
 				}
-				send(LevelChange, StatusNeutral, fmt.Sprintf("environment is %s", EtcdEnvironment))
+				send(LevelChange, StatusNeutral, fmt.Sprintf("environment is %s", EtcdEnv))
 
 			default:
 				send(LevelDebug, StatusNeutral, fmt.Sprintf("unknown config key: %s", resp.Node.Key))

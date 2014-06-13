@@ -177,24 +177,29 @@ func DockerListener(in, out chan Message) {
 
 				// now we start the container with the current configuration
 				send(LevelDebug, StatusNeutral, "starting new container")
-				_, err = dockerClient.CreateAndStart(
-					name,
-					&docker.Config{
-						Image: img,
-						// TODO: command
-						// TODO: env
-					},
-					&docker.HostConfig{
-						PublishAllPorts: true,
-						// TODO: dns
-						// TODO: ports
-					},
-				)
+
+				conf := docker.Config{
+					Image: img,
+					Env:   EtcdEnv,
+					Cmd:   config.Command,
+				}
+
+				host := docker.HostConfig{
+					PublishAllPorts: true,
+				}
+				if config.DNS != "" {
+					host.Dns = strings.Split(config.DNS, ",")
+				}
+
+				fmt.Printf("%+v\n", host)
+
+				_, err = dockerClient.CreateAndStart(name, &conf, &host)
 
 				if err != nil {
 					send(LevelFatal, StatusBad, fmt.Sprintf("could not start container: %s", err))
+				} else {
+					send(LevelChange, StatusGood, "container running")
 				}
-				send(LevelChange, StatusGood, "container running")
 
 				timer = nil
 			}
