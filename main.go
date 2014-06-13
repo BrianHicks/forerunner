@@ -2,30 +2,44 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 var (
-	router *Router
-	config *Config
+	router       *Router
+	config       *Config
+	dockerClient *DockerWrapper
 
 	TopicInit        = "init"
 	TopicShutdown    = "shutdown"
 	TopicEnvironment = "environment"
 	TopicDocker      = "docker"
+	TopicTCPHealth   = "tcp-health"
 )
 
 func init() {
 	router = NewRouter()
 	config = NewConfig()
+
+	client, err := docker.NewClient(config.DockerEndpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dockerClient = &DockerWrapper{client, docker.AuthConfiguration{}}
 }
 
 func main() {
-	router.Register(DockerListener, TopicInit, TopicShutdown, TopicEnvironment)
-	router.Register(LogListener, TopicInit, TopicShutdown, TopicDocker, TopicEnvironment)
 	router.Register(EnvironmentListener, TopicInit, TopicShutdown)
+	router.Register(DockerListener, TopicInit, TopicShutdown, TopicEnvironment)
+	router.Register(TCPHealthListener, TopicInit, TopicShutdown, TopicDocker)
+
+	router.Register(LogListener, TopicInit, TopicShutdown, TopicDocker, TopicEnvironment, TopicTCPHealth)
 
 	router.In <- Message{
 		Topic: TopicInit,

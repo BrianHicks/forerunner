@@ -13,6 +13,7 @@ import (
 
 var (
 	ErrNoSuchContainer = errors.New("no such container")
+	ErrNoPublicport    = errors.New("no public port")
 )
 
 type DockerWrapper struct {
@@ -78,16 +79,33 @@ func (d *DockerWrapper) CreateAndStart(name string, config *docker.Config, host 
 	return container, err
 }
 
-func DockerListener(in, out chan Message) {
-	send := Messenger(TopicDocker, out)
+func (d *DockerWrapper) PublicPort(name string, private int64) (int64, error) {
+	var port int64 = 0
 
-	client, err := docker.NewClient(config.DockerEndpoint)
+	container, err := d.ContainerByName(name)
 	if err != nil {
-		out <- MessageFromError(TopicDocker, LevelFatal, err)
-		return
+		return port, err
 	}
 
-	wrapper := DockerWrapper{client, docker.AuthConfiguration{}}
+	for _, maybe := range container.Ports {
+		if maybe.Type != "tcp" {
+			continue
+		}
+
+		if maybe.PrivatePort == private {
+			port = maybe.PublicPort
+		}
+	}
+
+	if port == 0 {
+		return port, ErrNoPublicport
+	} else {
+		return port, nil
+	}
+}
+
+func DockerListener(in, out chan Message) {
+	send := Messenger(TopicDocker, out)
 	name := config.Group + "-" + config.ID
 
 	var timer *time.Timer
@@ -119,7 +137,7 @@ func DockerListener(in, out chan Message) {
 				img := config.Image + ":" + EtcdTag
 				send(LevelInfo, "pulling "+img)
 
-				err := wrapper.Pull(config.Image, EtcdTag, config.Registry)
+				err := dockerClient.Pull(config.Image, EtcdTag, config.Registry)
 				if err != nil {
 					send(
 						LevelError,
@@ -131,7 +149,7 @@ func DockerListener(in, out chan Message) {
 				send(LevelDebug, "pulled "+img)
 
 				//// START ////
-				container, err := wrapper.ContainerByName(name)
+				container, err := dockerClient.ContainerByName(name)
 
 				// first, clean up old containers. We don't know what
 				// configuration they're running so we're just going to restart
@@ -146,7 +164,7 @@ func DockerListener(in, out chan Message) {
 				} else {
 					send(LevelInfo, "container running, cleaning before restart")
 
-					err = wrapper.CompletelyKill(container.ID)
+					err = dockerClient.CompletelyKill(container.ID)
 					if err != nil {
 						if strings.HasPrefix(err.Error(), "No such container") {
 							send(LevelWarning, fmt.Sprintf("%s", err))
@@ -159,7 +177,7 @@ func DockerListener(in, out chan Message) {
 
 				// now we start the container with the current configuration
 				send(LevelDebug, "starting new container")
-				_, err = wrapper.CreateAndStart(
+				_, err = dockerClient.CreateAndStart(
 					name,
 					&docker.Config{
 						Image: img,
@@ -191,7 +209,7 @@ func DockerListener(in, out chan Message) {
 			}
 
 		case TopicShutdown:
-			container, err := wrapper.ContainerByName(name)
+			container, err := dockerClient.ContainerByName(name)
 
 			if err != nil && err != ErrNoSuchContainer {
 				send(LevelFatal, fmt.Sprintf("error getting containers: %s", err))
@@ -202,7 +220,7 @@ func DockerListener(in, out chan Message) {
 			} else {
 				send(LevelInfo, "shutting down container")
 
-				err = wrapper.CompletelyKill(container.ID)
+				err = dockerClient.CompletelyKill(container.ID)
 				if err != nil {
 					if strings.HasPrefix(err.Error(), "No such container") {
 						send(LevelWarning, fmt.Sprintf("%s", err))

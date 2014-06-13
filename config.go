@@ -26,6 +26,10 @@ type Config struct {
 	// Etcd
 	EtcdHosts    string
 	ConfigPrefix string
+
+	// Health
+	TCPHealthPort int64
+	TCPHealthHost string
 }
 
 func NewConfig() *Config {
@@ -45,6 +49,9 @@ func NewConfig() *Config {
 
 	set.StringVar(&c.EtcdHosts, "etcd-hosts", "http://127.0.0.1:4001", "comma-separated list of etcd hosts to connect to")
 	set.StringVar(&c.ConfigPrefix, "config-prefix", "/forerunner/", "etcd prefix to pull configuration from")
+
+	set.Int64Var(&c.TCPHealthPort, "tcp-health-port", 0, "container port to check over TCP")
+	set.StringVar(&c.TCPHealthHost, "tcp-health-host", "127.0.0.1", "container host")
 
 	err := set.Parse(os.Args)
 	if err != nil {
