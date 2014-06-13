@@ -15,11 +15,22 @@ const (
 	LevelFatal
 )
 
+type Status string
+
+var (
+	StatusNeutral Status = "neutral"
+	StatusGood    Status = "good"
+	StatusBad     Status = "bad"
+	StatusUp      Status = "up"
+	StatusDown    Status = "down"
+)
+
 var names = []string{"debug", "info", "change", "warning", "error", "fatal"}
 
 type Message struct {
 	Topic   string
 	Level   int
+	Status  Status
 	Message string
 	Sent    time.Time
 }
@@ -96,11 +107,12 @@ func (r *Router) Route() {
 	}
 }
 
-func Messenger(topic string, to chan Message) func(int, string) {
-	return func(level int, message string) {
+func Messenger(topic string, to chan Message) func(int, Status, string) {
+	return func(level int, status Status, message string) {
 		to <- Message{
 			Topic:   topic,
 			Level:   level,
+			Status:  status,
 			Message: message,
 			Sent:    time.Now(),
 		}

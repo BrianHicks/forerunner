@@ -120,7 +120,7 @@ func DockerListener(in, out chan Message) {
 			if config.Image == "" {
 				log.Fatal("Image is required for Docker")
 			}
-			send(LevelInfo, fmt.Sprintf("docker ready (%s)", name))
+			send(LevelInfo, StatusGood, fmt.Sprintf("docker ready (%s)", name))
 
 		case TopicEnvironment:
 			// reset here because environment changes can come together pretty
@@ -135,18 +135,18 @@ func DockerListener(in, out chan Message) {
 
 				//// PULL IMAGE ////
 				img := config.Image + ":" + EtcdTag
-				send(LevelInfo, "pulling "+img)
+				send(LevelInfo, StatusNeutral, "pulling "+img)
 
 				err := dockerClient.Pull(config.Image, EtcdTag, config.Registry)
 				if err != nil {
 					send(
-						LevelError,
+						LevelError, StatusBad,
 						fmt.Sprintf("error pulling %s: %s", img, err),
 					)
 					return
 				}
 
-				send(LevelDebug, "pulled "+img)
+				send(LevelDebug, StatusNeutral, "pulled "+img)
 
 				//// START ////
 				container, err := dockerClient.ContainerByName(name)
@@ -155,28 +155,28 @@ func DockerListener(in, out chan Message) {
 				// configuration they're running so we're just going to restart
 				// the container with the new configuration.
 				if err != nil && err != ErrNoSuchContainer {
-					send(LevelFatal, fmt.Sprintf("error getting containers: %s", err))
+					send(LevelFatal, StatusBad, fmt.Sprintf("error getting containers: %s", err))
 					return
 
 				} else if err == ErrNoSuchContainer {
-					send(LevelDebug, "no container running")
+					send(LevelDebug, StatusNeutral, "no container running")
 
 				} else {
-					send(LevelInfo, "container running, cleaning before restart")
+					send(LevelInfo, StatusNeutral, "container running, cleaning before restart")
 
 					err = dockerClient.CompletelyKill(container.ID)
 					if err != nil {
 						if strings.HasPrefix(err.Error(), "No such container") {
-							send(LevelWarning, fmt.Sprintf("%s", err))
+							send(LevelWarning, StatusBad, fmt.Sprintf("%s", err))
 						} else {
-							send(LevelFatal, fmt.Sprintf("%s", err))
+							send(LevelFatal, StatusBad, fmt.Sprintf("%s", err))
 							return
 						}
 					}
 				}
 
 				// now we start the container with the current configuration
-				send(LevelDebug, "starting new container")
+				send(LevelDebug, StatusNeutral, "starting new container")
 				_, err = dockerClient.CreateAndStart(
 					name,
 					&docker.Config{
@@ -192,18 +192,18 @@ func DockerListener(in, out chan Message) {
 				)
 
 				if err != nil {
-					send(LevelFatal, fmt.Sprintf("could not start container: %s", err))
+					send(LevelFatal, StatusBad, fmt.Sprintf("could not start container: %s", err))
 				}
-				send(LevelChange, "container running")
+				send(LevelChange, StatusGood, "container running")
 
 				timer = nil
 			}
 
 			if timer == nil {
-				send(LevelInfo, fmt.Sprintf("detected configuration change, waiting for %s to reset", timeout))
+				send(LevelInfo, StatusNeutral, fmt.Sprintf("detected configuration change, waiting for %s to reset", timeout))
 				timer = time.AfterFunc(timeout, reset)
 			} else if timer.Reset(timeout) {
-				send(LevelDebug, fmt.Sprintf("additional configuration changes, resetting timer to %s", timeout))
+				send(LevelDebug, StatusNeutral, fmt.Sprintf("additional configuration changes, resetting timer to %s", timeout))
 			} else {
 				timer = time.AfterFunc(timeout, reset)
 			}
@@ -212,20 +212,20 @@ func DockerListener(in, out chan Message) {
 			container, err := dockerClient.ContainerByName(name)
 
 			if err != nil && err != ErrNoSuchContainer {
-				send(LevelFatal, fmt.Sprintf("error getting containers: %s", err))
+				send(LevelFatal, StatusBad, fmt.Sprintf("error getting containers: %s", err))
 
 			} else if err == ErrNoSuchContainer {
-				send(LevelDebug, "no container running")
+				send(LevelDebug, StatusNeutral, "no container running")
 
 			} else {
-				send(LevelInfo, "shutting down container")
+				send(LevelInfo, StatusNeutral, "shutting down container")
 
 				err = dockerClient.CompletelyKill(container.ID)
 				if err != nil {
 					if strings.HasPrefix(err.Error(), "No such container") {
-						send(LevelWarning, fmt.Sprintf("%s", err))
+						send(LevelWarning, StatusNeutral, fmt.Sprintf("%s", err))
 					} else {
-						send(LevelFatal, fmt.Sprintf("%s", err))
+						send(LevelFatal, StatusNeutral, fmt.Sprintf("%s", err))
 					}
 				}
 			}

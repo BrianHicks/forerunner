@@ -26,7 +26,7 @@ func TCPHealthListener(in, out chan Message) {
 			switch message.Topic {
 			case TopicInit:
 				if config.TCPHealthPort == 0 {
-					send(LevelDebug, "no port set, TCP health exiting")
+					send(LevelDebug, StatusBad, "no port set, TCP health exiting")
 				}
 				name = config.Group + "-" + config.ID
 
@@ -36,7 +36,7 @@ func TCPHealthListener(in, out chan Message) {
 					continue
 				}
 
-				send(LevelInfo, fmt.Sprintf("healthcheck starting on %s", config.TCPHealthHost))
+				send(LevelInfo, StatusNeutral, fmt.Sprintf("healthcheck starting on %s", config.TCPHealthHost))
 				tick = time.Tick(5 * time.Second)
 				started = true
 			}
@@ -44,23 +44,29 @@ func TCPHealthListener(in, out chan Message) {
 		case <-tick:
 			port, err := dockerClient.PublicPort(name, config.TCPHealthPort)
 			if err != nil {
-				send(LevelDebug, err.Error())
+				send(LevelDebug, StatusDown, err.Error())
 				checks <- false
 				continue
 			}
 
 			_, err = net.Dial("tcp", fmt.Sprintf("%s:%d", config.TCPHealthHost, port))
 			if err != nil {
-				send(LevelDebug, err.Error())
+				send(LevelDebug, StatusDown, err.Error())
 				checks <- false
 				continue
 			}
 
-			send(LevelDebug, "check passed")
+			send(LevelDebug, StatusUp, "check passed")
 			checks <- true
 
 		case current := <-status:
-			send(LevelChange, fmt.Sprintf("healthy: %t", current))
+			var status Status
+			if current {
+				status = StatusUp
+			} else {
+				status = StatusDown
+			}
+			send(LevelChange, status, fmt.Sprintf("healthy: %t", current))
 		}
 	}
 }

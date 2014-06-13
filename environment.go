@@ -29,48 +29,48 @@ func EnvironmentListener(in, out chan Message) {
 		case message := <-in:
 			switch message.Topic {
 			case TopicInit:
-				send(LevelInfo, fmt.Sprintf("setting watch on %s", config.ConfigPrefix))
+				send(LevelInfo, StatusNeutral, fmt.Sprintf("setting watch on %s", config.ConfigPrefix))
 				go client.Watch(config.ConfigPrefix, 0, true, watch, watchStop)
 
-				send(LevelInfo, "getting initial configuration from etcd")
+				send(LevelInfo, StatusNeutral, "getting initial configuration from etcd")
 				resp, err := client.Get(tagKey, false, false)
 				if err != nil {
-					send(LevelFatal, fmt.Sprintf("failed to get tag: %s", err))
+					send(LevelFatal, StatusBad, fmt.Sprintf("failed to get tag: %s", err))
 				}
 				watch <- resp
 
 				resp, err = client.Get(envKey, false, false)
 				if err != nil {
-					send(LevelFatal, fmt.Sprintf("failed to get env: %s", err))
+					send(LevelFatal, StatusBad, fmt.Sprintf("failed to get env: %s", err))
 				}
 				watch <- resp
 
 			case TopicShutdown:
 				watchStop <- true
-				send(LevelInfo, fmt.Sprintf("cleared watches on %s", config.ConfigPrefix))
+				send(LevelInfo, StatusNeutral, fmt.Sprintf("cleared watches on %s", config.ConfigPrefix))
 				return
 			}
 
 		case resp := <-watch:
 			if resp == nil {
-				send(LevelWarning, "received a nil response")
+				send(LevelWarning, StatusBad, "received a nil response")
 				continue
 			}
 
 			switch resp.Node.Key {
 			case tagKey:
 				EtcdTag = resp.Node.Value
-				send(LevelChange, fmt.Sprintf("tag is %s", EtcdTag))
+				send(LevelChange, StatusNeutral, fmt.Sprintf("tag is %s", EtcdTag))
 
 			case envKey:
 				err := json.Unmarshal([]byte(resp.Node.Value), &EtcdEnvironment)
 				if err != nil {
-					send(LevelFatal, fmt.Sprintf("error loading env: %s", err))
+					send(LevelFatal, StatusNeutral, fmt.Sprintf("error loading env: %s", err))
 				}
-				send(LevelChange, fmt.Sprintf("environment is %s", EtcdEnvironment))
+				send(LevelChange, StatusNeutral, fmt.Sprintf("environment is %s", EtcdEnvironment))
 
 			default:
-				send(LevelDebug, fmt.Sprintf("unknown config key: %s", resp.Node.Key))
+				send(LevelDebug, StatusNeutral, fmt.Sprintf("unknown config key: %s", resp.Node.Key))
 			}
 		}
 	}
