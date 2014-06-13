@@ -16,6 +16,7 @@ func TCPHealthListener(in, out chan Message) {
 
 	started := false
 
+	period := 1 * time.Second
 	health := NewHealth(5)
 	checks := make(chan bool, 1)
 	status := health.Watch(checks)
@@ -26,7 +27,7 @@ func TCPHealthListener(in, out chan Message) {
 			switch message.Topic {
 			case TopicInit:
 				if config.TCPHealthPort == 0 {
-					send(LevelDebug, StatusBad, "no port set, TCP health exiting")
+					return
 				}
 				name = config.Group + "-" + config.ID
 
@@ -37,7 +38,7 @@ func TCPHealthListener(in, out chan Message) {
 				}
 
 				send(LevelInfo, StatusNeutral, fmt.Sprintf("healthcheck starting on %s", config.TCPHealthHost))
-				tick = time.Tick(5 * time.Second)
+				tick = time.Tick(period)
 				started = true
 			}
 

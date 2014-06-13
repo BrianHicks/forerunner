@@ -32,6 +32,13 @@ type Config struct {
 	// Health
 	TCPHealthPort int64
 	TCPHealthHost string
+
+	// Vulcan
+	RegisterVulcan bool
+
+	// Public Information
+	PublicHost string
+	PublicPort int64
 }
 
 func NewConfig() *Config {
@@ -55,6 +62,11 @@ func NewConfig() *Config {
 
 	set.Int64Var(&c.TCPHealthPort, "tcp-health-port", 0, "container port to check over TCP")
 	set.StringVar(&c.TCPHealthHost, "tcp-health-host", "127.0.0.1", "container host")
+
+	set.BoolVar(&c.RegisterVulcan, "register-vulcan", false, "register a vulcan endpoint for this service")
+
+	set.StringVar(&c.PublicHost, "public-host", "127.0.0.1", "public IP for service routing")
+	set.Int64Var(&c.PublicPort, "public-port", 0, "public port for service routing")
 
 	err := set.Parse(os.Args)
 

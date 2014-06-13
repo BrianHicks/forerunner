@@ -20,6 +20,7 @@ var (
 	TopicEnvironment = "environment"
 	TopicDocker      = "docker"
 	TopicTCPHealth   = "tcp-health"
+	TopicVulcan      = "vulcan"
 )
 
 func init() {
@@ -39,7 +40,12 @@ func main() {
 	router.Register(DockerListener, TopicInit, TopicShutdown, TopicEnvironment)
 	router.Register(TCPHealthListener, TopicInit, TopicShutdown, TopicDocker)
 
-	router.Register(LogListener, TopicInit, TopicShutdown, TopicDocker, TopicEnvironment, TopicTCPHealth)
+	router.Register(VulcanListener, TopicInit, TopicShutdown, TopicTCPHealth, TopicDocker)
+
+	router.Register(
+		LogListener,
+		TopicInit, TopicShutdown, TopicDocker, TopicEnvironment, TopicTCPHealth, TopicVulcan,
+	)
 
 	router.In <- Message{
 		Topic: TopicInit,
